@@ -59,11 +59,13 @@ private:
 	void processGrouping( QList< QColor >& colorZone, const unsigned short group );		// Apply pixel grouping
 	int colorInRange( const int oldColor, const int delta ) const;	// Adjust oldColor by delta within range 0-255
 	QColor getAverageColor( const unsigned char * const buf, const unsigned short width, const unsigned short height ) const;	// Calculate average color of segment
+	QColor getAverageColor(const SparseRegion &region) const;
 	void selectComboBoxItemByData( QComboBox * cb, const QVariant val );	// Simply selects Combo box item by it's data
 public slots:
 	void onStartStopClick();						// Start-stop button click
 	void setThreadIsRunning( bool r );				// Update UI from thread by it's state
 	void onImageCaptured( CRegions *regions );		// Process regions data from thread
+	void onSparseImageCaptured(SparseRegions *regions );		// Process regions data from thread
 	void displayRefreshRate( int rate );			// Display current refresh rate
 
 	void onCloseClick();							// Tray icon menu "Exit" click

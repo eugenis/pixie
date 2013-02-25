@@ -17,7 +17,8 @@ HEADERS += CaptureThread.h \
            Regions.h \
            Settings.h \
            stdafx.h \
-           UniCaptureThread.h
+           UniCaptureThread.h \
+           XShmCaptureThread.h
 FORMS += pixie.ui
 SOURCES += CaptureThread.cpp \
            helpers.cpp \
@@ -27,6 +28,7 @@ SOURCES += CaptureThread.cpp \
            Regions.cpp \
            Settings.cpp \
            stdafx.cpp \
-           UniCaptureThread.cpp
+           UniCaptureThread.cpp \
+           XShmCaptureThread.cpp
 RESOURCES += pixie.qrc
 TRANSLATIONS += pixie_en.ts pixie_ru.ts

@@ -15,6 +15,7 @@ CCaptureThread::CCaptureThread( QWidget *parent, bool *stopThread, CSettings *se
 	*/
 
 	QObject::connect( this, &CCaptureThread::onImageCaptured, (Pixie*)parent, &Pixie::onImageCaptured);
+	QObject::connect( this, &CCaptureThread::onSparseImageCaptured, (Pixie*)parent, &Pixie::onSparseImageCaptured);
 	QObject::connect( this, &CCaptureThread::setIsRunning, (Pixie*)parent, &Pixie::setThreadIsRunning);
 	QObject::connect( this, &CCaptureThread::displayRefreshRate, (Pixie*)parent, &Pixie::displayRefreshRate);
 }

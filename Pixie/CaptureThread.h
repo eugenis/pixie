@@ -31,6 +31,7 @@ protected:
 
 signals:
 	void onImageCaptured( CRegions * ); // Send regions data to process by parent widget
+	void onSparseImageCaptured( SparseRegions * ); // Send regions data to process by parent widget
 	void setIsRunning( bool );			// Send thread status updates to parent widget
 	void displayRefreshRate( int );		// Send refresh rate to display
 };

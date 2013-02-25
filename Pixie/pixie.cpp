@@ -2,6 +2,7 @@
 #include "pixie.h"
 #include "helpers.h"
 #include "UniCaptureThread.h"
+#include "XShmCaptureThread.h"
 
 #ifdef WIN32
 #include "GDISimpleThread.h"
@@ -201,7 +202,7 @@ void Pixie::onStartStopClick() {
 				captureThread = new CDXSimpleThread( this, &stopThread, &settings, &readyToProcess );
 			else if ( ui.bnQt->isChecked() )
 #endif
-				captureThread = new CUniCaptureThread( this, &stopThread, &settings, &readyToProcess, QApplication::desktop()->winId() );
+				captureThread = new CXShmCaptureThread( this, &stopThread, &settings, &readyToProcess, QApplication::desktop()->winId() );
 
 			captureThread->start();
 		}
@@ -274,6 +275,29 @@ QColor Pixie::getAverageColor( const unsigned char * const buf, const unsigned s
 #endif
 	return resRGB;
 }
+
+
+QColor Pixie::getAverageColor(const SparseRegion &region) const {
+  unsigned char *buf = region.data;
+  unsigned B_avg = buf[ 0 ];
+  unsigned G_avg = buf[ 1 ];
+  unsigned R_avg = buf[ 2 ];
+  
+  for ( int y = 0; y < region.height; y++ ) {
+    for ( int x = 0; x < region.width; x++ ) {
+      int pos = y * region.stride + x * 4;
+      B_avg += buf[ pos + 0 ];
+      G_avg += buf[ pos + 1 ];
+      R_avg += buf[ pos + 2 ];
+    }
+  }
+      unsigned cnt = region.height * region.width;
+  R_avg = R_avg / cnt;
+  G_avg = G_avg / cnt;
+  B_avg = B_avg / cnt;
+  return QColor(R_avg, G_avg, B_avg);
+}
+
 bool Pixie::eventFilter( QObject* watched, QEvent* event ) {
 	bool res = false;
 
@@ -342,6 +366,41 @@ void Pixie::onImageCaptured( CRegions * regions ) {
 	}
 
 	delete regions;	
+
+	applyProcessing();
+	if ( settings.previewEnabled )
+		update();
+	
+	sendToArduino();
+
+	readyToProcess = true;
+}
+
+void Pixie::onSparseImageCaptured( SparseRegions * regions ) {
+	colorHTop.clear();
+	colorHBottom.clear();
+	colorVLeft.clear();
+	colorVRight.clear();
+
+	// unsigned int hSize = regions->getHSize();
+	for ( size_t i = 0; i < regions->regionHTop.size(); i++ ) {
+		//saveImg( QString( "ht_%1.bmp" ).arg( i ), regions->regionHTop.at( i ), hSize, regions->hWidth, regions->hHeight );
+	  colorHTop.push_back( getAverageColor( regions->regionHTop.at( i ) ) );
+	}
+	for ( size_t i = 0; i < regions->regionHBottom.size(); i++ ) {
+		//saveImg( QString( "hb_%1.bmp" ).arg( i ), regions->regionHBottom.at( i ), hSize, regions->hWidth, regions->hHeight );
+	  colorHBottom.push_back( getAverageColor( regions->regionHBottom.at( i ) ) );
+	}
+
+	// unsigned size_t vSize = regions->getVSize();
+	for ( size_t i = 0; i < regions->regionVLeft.size(); i++ ) {
+		//saveImg( QString( "vl_%1.bmp" ).arg( i ), regions->regionVLeft.at( i ), vSize, regions->vWidth, regions->vHeight );
+		colorVLeft.push_back( getAverageColor( regions->regionVLeft.at( i ) ) );
+	}
+	for ( size_t i = 0; i < regions->regionVRight.size(); i++ ) {
+		//saveImg( QString( "vr_%1.bmp" ).arg( i ), regions->regionVRight.at( i ), vSize, regions->vWidth, regions->vHeight );
+		colorVRight.push_back( getAverageColor( regions->regionVRight.at( i ) ) );
+	}
 
 	applyProcessing();
 	if ( settings.previewEnabled )
