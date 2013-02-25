@@ -25,8 +25,9 @@ private:
 	int height;
 	Window rootWindow;
 	int depth;
-	XShmSegmentInfo shminfo;
-	XImage *image;
+
+	XShmSegmentInfo shminfos[4];
+	XImage *images[4];
 
 	SparseRegions *regions;
 };

@@ -14,6 +14,7 @@ CXShmCaptureThread::CXShmCaptureThread( QWidget *parent, bool *stopThread, CSett
 
 CXShmCaptureThread::~CXShmCaptureThread() {
 }
+
 void CXShmCaptureThread::init() {
     dpy = XOpenDisplay(NULL);
     screen = DefaultScreen(dpy);
@@ -23,23 +24,6 @@ void CXShmCaptureThread::init() {
     rootWindow = RootWindow(dpy, screen);
     depth = DefaultDepth(dpy, screen);
 
-    image = XShmCreateImage(dpy,
-			    visual,
-			    depth,
-			    ZPixmap,
-			    NULL,
-			    &shminfo,
-			    width,
-			    height);
-    shminfo.shmid = shmget(IPC_PRIVATE,
-			   image->bytes_per_line * image->height,
-			   IPC_CREAT | 0777);
-    assert(shminfo.shmid != -1);
-    shminfo.shmaddr = image->data = (char*)shmat(shminfo.shmid, NULL, 0);
-    shminfo.readOnly = False;
-    int res = XShmAttach(dpy, &shminfo);
-    assert(res);
-
     regions = new SparseRegions( settings->getHorizontalSegmentWidth( width ), settings->getHorizontalHeight( height ),
 				 settings->getVerticalWidth( width ), settings->getVerticalSegmentHeight( height ) );
     regions->regionHTop.resize(settings->LEDnumH);
@@ -48,6 +32,27 @@ void CXShmCaptureThread::init() {
     regions->regionVRight.resize(settings->LEDnumV);
     
     printf("%d %d %d %d\n", regions->hWidth, regions->hHeight, regions->vWidth, regions->vHeight);
+
+    // HTop
+    images[0] = XShmCreateImage(dpy, visual, depth, ZPixmap, NULL, &shminfos[0], width, regions->hHeight);
+    // HBottom
+    images[1] = XShmCreateImage(dpy, visual, depth, ZPixmap, NULL, &shminfos[1], width, regions->hHeight);
+    // VLeft
+    images[2] = XShmCreateImage(dpy, visual, depth, ZPixmap, NULL, &shminfos[2], regions->hWidth, height);
+    // VRight
+    images[3] = XShmCreateImage(dpy, visual, depth, ZPixmap, NULL, &shminfos[3], regions->hWidth, height);
+
+    for (int i = 0; i < 4; ++i) {
+      XImage *&image = images[i];
+      XShmSegmentInfo &shminfo = shminfos[i];
+      shminfo.shmid = shmget(IPC_PRIVATE, image->bytes_per_line * image->height, IPC_CREAT | 0777);
+      assert(shminfo.shmid != -1);
+      shminfo.shmaddr = image->data = (char*)shmat(shminfo.shmid, NULL, 0);
+      shminfo.readOnly = False;
+      int res = XShmAttach(dpy, &shminfo);
+      assert(res);
+    }
+
 }
 
 void save(XImage &image, const char *fname) {
@@ -77,14 +82,22 @@ void CXShmCaptureThread::run() {
 	while( !*stopThread ) {
 		if ( *readyToProcess == true ) {			
 
-		      bool res = XShmGetImage(dpy,
-			    rootWindow,
-			    image,
-			    0,
-			    0,
-			    AllPlanes);
+		  bool res;
+		  // HTop
+		  res = XShmGetImage(dpy, rootWindow, images[0], 0, 0, AllPlanes);
+		  assert(res);
 
-		      assert(res);
+		  // HBottom
+		  res = XShmGetImage(dpy, rootWindow, images[1], 0, height - regions->hHeight, AllPlanes);
+		  assert(res);
+
+		  // VLeft
+		  res = XShmGetImage(dpy, rootWindow, images[2], 0, 0, AllPlanes);
+		  assert(res);
+
+		  // VRight
+		  res = XShmGetImage(dpy, rootWindow, images[3], width - regions->vWidth, 0, AllPlanes);
+		  assert(res);
 
 
 #define IMGPTR(img, x, y) (unsigned char*)((img)->data + (y) * (img)->bytes_per_line + (x) * 4)
@@ -96,7 +109,7 @@ void CXShmCaptureThread::run() {
 				// unsigned char * bufH_tmp = new unsigned char[ bufHSize ];
 				// memcpy( bufH_tmp, im.bits(), bufHSize );
 
-			  regions->regionHTop[x] = SparseRegion(IMGPTR(image, x * regions->hWidth, 0), regions->hWidth, regions->hHeight, image->bytes_per_line);
+			  regions->regionHTop[x] = SparseRegion(IMGPTR(images[0], x * regions->hWidth, 0), regions->hWidth, regions->hHeight, images[0]->bytes_per_line);
 			}
 			
 			// Bottom
@@ -105,7 +118,7 @@ void CXShmCaptureThread::run() {
 				// unsigned char * bufH_tmp = new unsigned char[ bufHSize ];
 				// memcpy( bufH_tmp, im.bits(), bufHSize );
 
-				regions->regionHBottom[x] = SparseRegion(IMGPTR(image, x * regions->hWidth, height - regions->hHeight), regions->hWidth, regions->hHeight, image->bytes_per_line);
+				regions->regionHBottom[x] = SparseRegion(IMGPTR(images[1], x * regions->hWidth, 0), regions->hWidth, regions->hHeight, images[1]->bytes_per_line);
 
 				// regions->regionHBottom.push_back( bufH_tmp );			
 			}
@@ -117,7 +130,7 @@ void CXShmCaptureThread::run() {
 				// unsigned char * bufV_tmp = new unsigned char[ bufVSize ];
 				// memcpy( bufV_tmp, im.bits(), bufVSize );
 
-				regions->regionVLeft[x] = SparseRegion(IMGPTR(image, 0, x * regions->vHeight), regions->vWidth, regions->vHeight, image->bytes_per_line);
+				regions->regionVLeft[x] = SparseRegion(IMGPTR(images[2], 0, x * regions->vHeight), regions->vWidth, regions->vHeight, images[2]->bytes_per_line);
 
 				// regions->regionVLeft.push_back( bufV_tmp );
 			}
@@ -128,7 +141,7 @@ void CXShmCaptureThread::run() {
 				// unsigned char * bufV_tmp = new unsigned char[ bufVSize ];
 				// memcpy( bufV_tmp, im.bits(), bufVSize );
 
-				regions->regionVRight[x] = SparseRegion(IMGPTR(image, width - regions->vWidth, x * regions->vHeight), regions->vWidth, regions->vHeight, image->bytes_per_line);
+				regions->regionVRight[x] = SparseRegion(IMGPTR(images[3], 0, x * regions->vHeight), regions->vWidth, regions->vHeight, images[3]->bytes_per_line);
 
 				// regions->regionVRight.push_back( bufV_tmp );			
 			}
